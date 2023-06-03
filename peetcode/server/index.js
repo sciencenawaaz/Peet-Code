@@ -1,5 +1,6 @@
 const express = require("express");
 const app = express();
+const bcrypt = require("bcrypt");
 const dotenv = require("dotenv");
 dotenv.config();
 const jwt = require("jsonwebtoken");
@@ -12,6 +13,7 @@ const {auth} = require("./middlewear");
 const port = process.env.PORT;
 
 let USERID = 1;
+let saltRounds = 10;
 const USER = [];
 const SUBMISSIONS = [];
 
@@ -116,15 +118,24 @@ app.get( "/problem/:id" , (req,res) => {
         res.json(filteredProblem);
 } )
 
-app.post("/signup" , (req,res) => {
+app.post("/signup" , async (req,res) => {
         const { name, email, password} = req.body;
         const userId = USERID++;
         const user = USER.find((x) => email === x.email)
         if(user) {
                return res.status(403).json({msg: "User already exists"});
         }
-        USER.push({name, email, password, userId});
-        res.status(201).json({name, email, password , userId});
+
+       
+       const salt = await bcrypt.genSalt(saltRounds);
+      
+       
+        
+        const hash = await bcrypt.hash(password,salt)
+          
+              
+        USER.push({name, email,hash,salt, userId});
+        res.status(201).json({name, email,hash,salt, userId});
 
 })
 
@@ -132,14 +143,20 @@ app.get("/me",auth, (req,res) => {
   return res.status(200).json({msg:"I Live"});
 })
 
-app.post("/signin" , (req,res) => {
+app.post("/signin" , async (req,res) => {
         const { email, password} = req.body;
         const user = USER.find((x) => email === x.email)
         
         if(!user) {
                return res.status(403).json({msg: "User does not exist"});
         }
-        if (user.password !== password) {
+
+        const isPassword = await bcrypt.compare(password,user.hash)
+        console.log(isPassword);
+        console.log(password);
+        console.log(user.hash);
+        
+        if (!isPassword) {
                 return res.status(403).json({ msg: "Incorrect username or password" });
               }
         
